@@ -38,14 +38,14 @@ Currently supported models:
 
 ## example
 ```md
-@mistral.mistral-small-latest
+@mistral -m mistral-small-latest
 Write a factorial function in plain C.
 @end
 ```
 
 Your markdown buffer will be filled with the answer.
 ```
-@mistral.mistral-small-latest
+@mistral -m mistral-small-latest
 write a factorial function in plain c
 {{chat}}
 Sure, here's a simple implementation of a factorial function in C:
@@ -66,6 +66,13 @@ int main() {
 }
 ``
 This program first asks the user to input a number, then calculates and prints the factorial of that number. The factorial function itself is implemented using recursion.
+@end
+```
+
+If you don't want to produce specifically code, and remove the default context which conditions the LLM to answer with well structured code samples, you can add the `--no-context` argument to the tags
+```
+@mistral --no-context
+Write an executive summary for the project
 @end
 ```
 

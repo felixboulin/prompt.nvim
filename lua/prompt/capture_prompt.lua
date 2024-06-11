@@ -18,21 +18,37 @@ local function get_context()
   return context
 end
 
-local function parse_api_model(tag)
-  local api, model = tag:match '@(%w+)[.]?([%w-]*)'
-  print(api, model)
-  if not api then
-    return config.default_api, config.default_model
-  elseif model == '' then
-    return api, config.default_model
+local function parse_api_model(line)
+  local api, model, context
+
+  -- Extract API parameter after '@'
+  api = line:match '@(%w+)'
+
+  -- Check if there's a model parameter -m
+  model = line:match '%-m%s+([%w-]*)'
+
+  -- Check if there's a context parameter -c
+  context = true
+  local context_match = line:match '%-%-no%-context'
+  print('context_match ', context_match)
+  if context_match == '--no-context' then
+    context = false
+  end
+
+  if not model then
+    return api, config.default_model, context
   else
-    return api, model
+    return api, model, context
   end
 end
 
 function M.test()
   print 'hello from capture'
-  print(get_context())
+  local api, model, context = parse_api_model '@mistral -m mistral-tiny'
+  print(api, model, context)
+  api, model, context = parse_api_model '@mistal -m mistral-tiny -c no-context'
+
+  print(api, model, context)
 end
 
 function M.capture_prompt()
@@ -40,10 +56,8 @@ function M.capture_prompt()
   local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
   local input = {}
   local capturing = false
-  local api, model = nil, nil
-  local context = get_context()
-
-  table.insert(input, context)
+  local api, model, context = nil, nil, nil
+  local context_text = ''
 
   for _, line in ipairs(lines) do
     if line:find('@end', 1, true) then
@@ -52,7 +66,11 @@ function M.capture_prompt()
       end
     elseif line:match '@(%w+)[.]?(%w*)' then
       if not capturing then
-        api, model = parse_api_model(line)
+        api, model, context = parse_api_model(line)
+        if context == true then
+          context_text = get_context()
+        end
+        table.insert(input, context_text)
         capturing = true
       end
     elseif capturing then
