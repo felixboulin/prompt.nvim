@@ -20,10 +20,12 @@ local function get_api_key(api)
   return api_key
 end
 
-local function mistral_base_command(input, api, model)
-  local apikey = get_api_key(api)
+local function escape_json(text)
+  return text:gsub('"', '\\"'):gsub('\n', '\\n'):gsub('`', '\\`')
+end
 
-  local jq_command = string.format(
+local function format_data(model, input)
+  return string.format(
     [[jq -ncM --arg model "%s" --arg content "%s" '
         {
           model: $model,
@@ -36,9 +38,11 @@ local function mistral_base_command(input, api, model)
         }'
       ]],
     model,
-    input:gsub('"', '\\"'):gsub('\n', '\\n'):gsub('`', '\\`')
+    escape_json(input)
   )
+end
 
+local function mistral_chat_command(input, api_key, model)
   local curl_command = string.format(
     [[
       curl --location 'https://api.mistral.ai/v1/chat/completions' \
@@ -48,54 +52,72 @@ local function mistral_base_command(input, api, model)
         --data-raw "$(%s)" \
         --silent | jq -r '.choices[0].message.content'
       ]],
-    apikey,
-    jq_command
+    api_key,
+    format_data(model, input)
   )
   return curl_command
 end
 
-local function codestral_command(input, api, model)
-  local apikey = get_api_key(api)
+local function gpt_chat_command(input, api_key, model)
+  local curl_command = string.format(
+    [[
+      curl https://api.openai.com/v1/chat/completions \
+           --header "Authorization: Bearer %s" \
+           --header "content-type: application/json" \
+           --data-raw "$(%s)" \
+           --silent | jq -r '.choices[0].message.content'
+      ]],
+    api_key,
+    format_data(model, input)
+  )
+  return curl_command
+end
+
+local function claude_chat_command(input, api_key, model)
   local jq_command = string.format(
     [[jq -ncM --arg model "%s" --arg content "%s" '
         {
           model: $model,
-          prompt: $content,
-          suffix: "",
-          max_tokens: 256,
-          temperature: 0
+          max_tokens: 1024,
+          messages: [
+            {
+              role: "user",
+              content: $content
+            }
+          ]
         }'
       ]],
     model,
-    input:gsub('"', '\\"'):gsub('\n', '\\n'):gsub('`', '\\`')
+    escape_json(input)
   )
 
   local curl_command = string.format(
     [[
-      curl --location 'https://api.mistral.ai/v1/fim/completions' \
-        --header 'Content-Type: application/json' \
-        --header 'Accept: application/json' \
-        --header 'Authorization: Bearer %s' \
-        --data-raw "$(%s)" \
-        --silent | jq -r '.choices[0].message.content'
+      curl https://api.anthropic.com/v1/messages \
+           --header "x-api-key: %s" \
+           --header "anthropic-version: 2023-06-01" \
+           --header "content-type: application/json" \
+           --data-raw "$(%s)" \
+           --silent | jq -r '.content[0].text'
       ]],
-    apikey,
+    api_key,
     jq_command
   )
   return curl_command
 end
 
 function M.format_curl_command(input, api, model)
+  local api_key = get_api_key(api)
   if api == 'mistral' then
-    if model == 'codestral-latest' then
-      print 'using mistral codestral command'
-      return codestral_command(input, api, model)
-    else
-      print 'using mistral standard command'
-      return mistral_base_command(input, api, model)
-    end
+    print 'using mistral'
+    return mistral_chat_command(input, api_key, model)
+    -- end
   elseif api == 'claude' then
     print 'using claude'
+    return claude_chat_command(input, api_key, model)
+  elseif api == 'chatgpt' then
+    print ' using chatgpt'
+    return gpt_chat_command(input, api_key, model)
   else
     error('Unknown API: ' .. api)
   end

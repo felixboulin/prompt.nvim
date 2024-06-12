@@ -10,12 +10,7 @@ function M.setup(user_config)
 end
 
 function M.test()
-  local text, api, model = capture.capture_prompt()
-  print('using ', api, model)
-  local command = curl.format_curl_command(text, api, model)
-  print(command)
-  local answer = vim.fn.system(command)
-  print(answer)
+  capture.test()
 end
 
 function M.prompt()

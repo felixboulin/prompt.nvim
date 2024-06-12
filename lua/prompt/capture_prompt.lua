@@ -7,6 +7,7 @@ local function get_plugin_path()
 end
 
 local function get_context()
+  -- Use the plugin directory instead of the user config directory
   local context_file_path = get_plugin_path() .. 'context.txt'
   print(context_file_path)
   local context_file = io.open(context_file_path, 'r')
@@ -18,37 +19,50 @@ local function get_context()
   return context
 end
 
+local function trim(s)
+  return s:gsub('^%s*(.-)%s*$', '%1')
+end
+
 local function parse_api_model(line)
-  local api, model, context
+  local api = line:match '@(%w+)' -- Extract API parameter after '@'
+  if not api or not config[api] then
+    error 'Invalid or unspecified API in the input line.'
+  end
 
-  -- Extract API parameter after '@'
-  api = line:match '@(%w+)'
+  local model = line:match '%-m%s+([%w-]*)' -- Check if there's a model parameter -m
+  if model == nil then
+    model = config[api].default
+    local tier = line:match '%ssmall%s?' or line:match '%smedium%s?' or line:match '%slarge%s?'
+    if tier ~= nil then
+      model = config[api][trim(tier)]
+    end
+  end
 
-  -- Check if there's a model parameter -m
-  model = line:match '%-m%s+([%w-]*)'
-
-  -- Check if there's a context parameter -c
-  context = true
-  local context_match = line:match '%-%-no%-context'
-  print('context_match ', context_match)
-  if context_match == '--no-context' then
+  -- check if context disabled
+  local context = true --default
+  local context_match = line:match '%sno%-context%s?'
+  print('context match ', context_match)
+  if context_match ~= nil and trim(context_match) == 'no-context' then
     context = false
   end
 
-  if not model then
-    return api, config.default_model, context
-  else
-    return api, model, context
-  end
+  return api, model, context
 end
 
 function M.test()
-  print 'hello from capture'
-  local api, model, context = parse_api_model '@mistral -m mistral-tiny'
+  local api, model, context = parse_api_model '@mistral medium no-context'
   print(api, model, context)
-  api, model, context = parse_api_model '@mistal -m mistral-tiny -c no-context'
-
-  print(api, model, context)
+  if api == 'mistral' and model == config.mistral.medium and context == false then
+    print 'In buffer command parses successfully'
+  else
+    print 'ERROR parsing buffer commands'
+  end
+  -- print 'hello from capture'
+  -- local api, model, context = parse_api_model '@mistral -m mistral-tiny'
+  -- print(api, model, context)
+  -- api, model, context = parse_api_model '@mistal -m mistral-tiny -c no-context'
+  --
+  -- print(api, model, context)
 end
 
 function M.capture_prompt()
