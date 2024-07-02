@@ -1,4 +1,3 @@
-local config = require 'prompt.config'
 local M = {}
 
 local function get_plugin_path()
@@ -23,18 +22,18 @@ local function trim(s)
   return s:gsub('^%s*(.-)%s*$', '%1')
 end
 
-local function parse_api_model(line)
+local function parse_api_model(line, Config)
   local api = line:match '@(%w+)' -- Extract API parameter after '@'
-  if not api or not config[api] then
+  if not api or not Config[api] then
     error 'Invalid or unspecified API in the input line.'
   end
 
   local model = line:match '%-m%s+([%w-]*)' -- Check if there's a model parameter -m
   if model == nil then
-    model = config[api].default
+    model = Config[api].default
     local tier = line:match '%ssmall%s?' or line:match '%smedium%s?' or line:match '%slarge%s?'
     if tier ~= nil then
-      model = config[api][trim(tier)]
+      model = Config[api][trim(tier)]
     end
   end
 
@@ -49,10 +48,10 @@ local function parse_api_model(line)
   return api, model, context
 end
 
-function M.test()
+function M.test(Config)
   local api, model, context = parse_api_model '@mistral medium no-context'
   print(api, model, context)
-  if api == 'mistral' and model == config.mistral.medium and context == false then
+  if api == 'mistral' and model == Config.mistral.medium and context == false then
     print 'In buffer command parses successfully'
   else
     print 'ERROR parsing buffer commands'
@@ -65,7 +64,7 @@ function M.test()
   -- print(api, model, context)
 end
 
-function M.capture_prompt()
+function M.capture_prompt(Config)
   local bufnr = vim.api.nvim_get_current_buf()
   local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
   local input = {}
@@ -80,7 +79,7 @@ function M.capture_prompt()
       end
     elseif line:match '@(%w+)[.]?(%w*)' then
       if not capturing then
-        api, model, context = parse_api_model(line)
+        api, model, context = parse_api_model(line, Config)
         if context == true then
           context_text = get_context()
         end

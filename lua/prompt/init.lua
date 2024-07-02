@@ -1,20 +1,21 @@
 local capture = require 'prompt.capture_prompt'
 local curl = require 'prompt.format_curl_command'
 local reply = require 'prompt.reply'
-local config = require 'prompt.config'
+Config = require 'prompt.config'
 local M = {}
 
 function M.setup(user_config)
   user_config = user_config or {}
-  config = vim.tbl_deep_extend('force', config, user_config)
+  Config = vim.tbl_deep_extend('force', Config, user_config)
 end
 
 function M.test()
-  capture.test()
+  -- capture.test()
+  print(Config.claude.medium)
 end
 
 function M.prompt()
-  local text, api, model = capture.capture_prompt()
+  local text, api, model = capture.capture_prompt(Config)
   print('using ', api, model)
   local command = curl.format_curl_command(text, api, model)
   local answer = vim.fn.system(command)
